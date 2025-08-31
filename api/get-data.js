@@ -6,7 +6,8 @@ const redis = new Redis({
     token: process.env.UPSTASH_REDIS_TOKEN,
 });
 
-const API_URL = "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01?serviceKey=pTlUJJOyorlSF5PxRVEJ1Eufr1MH64BnOaCLkyQY%2FOb%2BYQuY%2FT%2F9WICNg993%2B2%2F3uqTwDJNPMz7NIU54w6TTcg%3D%3D&page=1&perPage=100&cond[intg_pbanc_yn::EQ]=N&cond[supt_regin::LIKE]=%EC%A0%84%EA%B5%AD&returnType=json";
+const API_KEY = process.env.API_KEY;
+const API_URL = `https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01?serviceKey=${API_KEY}&page=1&perPage=100&cond[intg_pbanc_yn::EQ]=N&cond[supt_regin::LIKE]=%EC%A0%84%EA%B5%AD&returnType=json`;
 
 const CACHE_KEY = "kstartup-data";
 const CACHE_EXPIRATION_SECONDS = 3600; // 1시간 (초 단위)
