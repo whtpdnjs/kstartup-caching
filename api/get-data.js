@@ -2,8 +2,8 @@ import { Redis } from '@upstash/redis';
 import fetch from 'node-fetch';
 
 const redis = new Redis({
-    url: process.env.UPSTASH_REDIS_URL,
-    token: process.env.UPSTASH_REDIS_TOKEN,
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
 const API_KEY = process.env.API_KEY;
