@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>지원사업 공고 – 카드형 리스트(UI 디자인)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .shadow-soft{box-shadow:0 10px 30px rgba(0,0,0,.06)}
+  .badge{font-size:12px;padding:.25rem .6rem;border-radius:999px;border:1px solid #e5e7eb;background:#f8fafc}
+  .pill{font-size:12px;padding:.25rem .6rem;border-radius:999px;background:#eef2ff;color:#3730a3}
+  .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border-radius:.7rem;border:1px solid #e5e7eb;font-size:13px}
+  .btn:hover{background:#f9fafb}
+  .btn-primary{border-color:#2563eb;background:#2563eb;color:#fff}
+  .btn-primary:hover{filter:brightness(.95)}
+  .line-clamp-3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <main class="max-w-6xl mx-auto px-4 py-6 sm:py-10">
+    <!-- 헤더 / 필터 -->
+    <section class="mb-5 sm:mb-8">
+      <h1 class="text-2xl font-bold tracking-tight">지원사업 공고</h1>
+      <p class="text-gray-600 text-sm mt-1">Upstash Redis에 캐시된 JSON을 카드형으로 보여주는 샘플</p>
+
+      <div class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div class="flex gap-2">
+          <select id="filterRegion" class="border rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="">전체 지역</option>
+            <option value="전국">전국</option>
+            <option value="서울">서울</option>
+            <option value="경기">경기</option>
+            <option value="인천">인천</option>
+          </select>
+          <select id="filterStatus" class="border rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="">전체 상태</option>
+            <option value="Y">모집중</option>
+            <option value="N">마감/종료</option>
+          </select>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex gap-2">
+          <input id="search" type="text" placeholder="공고명, 기관명 검색" class="border rounded-lg px-3 py-2 text-sm bg-white w-64" />
+          <button id="btnReset" class="btn">초기화</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 리스트 -->
+    <section id="list" class="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></section>
+
+    <!-- 상세 모달 -->
+    <dialog id="dlg" class="w-full max-w-3xl rounded-2xl p-0 shadow-2xl">
+      <div class="p-5">
+        <div class="flex items-start justify-between gap-3">
+          <h3 id="dlgTitle" class="text-lg font-semibold"></h3>
+          <button onclick="dlg.close()" class="btn">닫기</button>
+        </div>
+        <div id="dlgBody" class="mt-3 text-sm text-gray-800"></div>
+      </div>
+    </dialog>
+  </main>
+
+<script>
+const $ = s => document.querySelector(s);
+const listEl = $("#list");
+const dlg = $("#dlg");
+const dlgTitle = $("#dlgTitle");
+const dlgBody = $("#dlgBody");
+
+function fmtDate8(s){ if(!s) return ""; s=(""+s).replace(/[^0-9]/g,""); return s.length===8?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:s; }
+function ellipsis(s, n=120){ if(!s) return ""; s=String(s).trim(); return s.length>n ? s.slice(0,n)+"…" : s; }
+function chip(text){ return `<span class="badge">${text}</span>`; }
+function pill(text){ return `<span class="pill">${text}</span>`; }
+
+function buildDetailHTML(item){
+  const title = item.biz_pbanc_nm || item.intg_pbanc_biz_nm || "지원사업 공고";
+  const start = item.pbanc_rcpt_bgng_dt_fmt || fmtDate8(item.pbanc_rcpt_bgng_dt);
+  const end   = item.pbanc_rcpt_end_dt_fmt || fmtDate8(item.pbanc_rcpt_end_dt);
+  const links = [];
+  if(item.detl_pg_url) links.push(`<a class="btn" href="${item.detl_pg_url}" target="_blank">상세보기</a>`);
+  if(item.aply_mthd_onli_rcpt_istc) links.push(`<a class="btn btn-primary" href="${item.aply_mthd_onli_rcpt_istc}" target="_blank">온라인 신청</a>`);
+  if(item.prch_cnpl_no) links.push(`<a class="btn" href="tel:${item.prch_cnpl_no}">문의전화</a>`);
+
+  const rows = ([
+    ["공고명", title],
+    ["접수기간", (start||end) ? `${start} ~ ${end}` : ""],
+    ["주관/담당", `${item.pbanc_ntrp_nm||""} / ${item.biz_prch_dprt_nm||""}`.replace(/ \/ $/,"")],
+    ["지원분류", item.supt_biz_clsfc||""],
+    ["지원대상", item.aply_trgt||""],
+    ["대상연령", item.biz_trgt_age||""],
+    ["지역", item.supt_regin||""],
+    ["공고번호", item.pbanc_sn||""],
+    ["진행여부", item.rcrt_prgs_yn==="Y"?"모집중":"-"],
+  ]).filter(x=>x[1]);
+
+  return `
+<div style="font-family:-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;line-height:1.6;">
+  <p style="margin:0 0 12px 0;">${(item.pbanc_ctnt||"").trim()}</p>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #eee;border-radius:12px;overflow:hidden;">
+    ${rows.map(([k,v]) =>
+      `<tr><th style="text-align:left;padding:8px 10px;background:#f8fafc;border-bottom:1px solid #eee;">${k}</th><td style="padding:8px 10px;border-bottom:1px solid #eee;">${v}</td></tr>`
+    ).join("")}
+  </table>
+  <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">${links.join("")}</div>
+  <p style="font-size:12px;color:#6b7280;margin-top:12px;">※ 본 글은 공개 API/DB를 바탕으로 구성되었습니다.</p>
+</div>`;
+}
+
+function buildCard(item){
+  const title = item.biz_pbanc_nm || item.intg_pbanc_biz_nm || "지원사업 공고";
+  const start = item.pbanc_rcpt_bgng_dt_fmt || fmtDate8(item.pbanc_rcpt_bgng_dt);
+  const end   = item.pbanc_rcpt_end_dt_fmt || fmtDate8(item.pbanc_rcpt_end_dt);
+  const region = item.supt_regin || "-";
+  const status = item.rcrt_prgs_yn==="Y" ? pill("모집중") : pill("종료");
+  const category = item.supt_biz_clsfc ? chip(item.supt_biz_clsfc) : "";
+  const org = item.pbanc_ntrp_nm ? chip(item.pbanc_ntrp_nm) : "";
+  const age = item.biz_trgt_age ? chip(item.biz_trgt_age) : "";
+  const desc = ellipsis(item.pbanc_ctnt, 130);
+
+  return `
+  <article class="bg-white rounded-2xl border shadow-soft p-4 flex flex-col">
+    <div class="flex items-start justify-between gap-3">
+      <h3 class="font-semibold text-[15px] leading-snug">${title}</h3>
+      <div class="shrink-0">${status}</div>
+    </div>
+
+    <div class="mt-2 text-[12px] text-gray-600">
+      접수기간 <b>${start||"-"} ~ ${end||"-"}</b> · 지역 ${region}
+    </div>
+
+    <p class="mt-3 text-sm text-gray-800 line-clamp-3">${desc}</p>
+
+    <div class="mt-3 flex flex-wrap gap-2">
+      ${category}${org}${age}
+    </div>
+
+    <div class="mt-4 flex items-center gap-2">
+      ${item.detl_pg_url ? `<a class="btn" target="_blank" href="${item.detl_pg_url}">상세보기</a>` : ""}
+      ${item.aply_mthd_onli_rcpt_istc ? `<a class="btn btn-primary" target="_blank" href="${item.aply_mthd_onli_rcpt_istc}">온라인 신청</a>` : ""}
+      <button class="btn" data-action="detail" data-sn="${item.pbanc_sn||""}">본문 보기</button>
+    </div>
+  </article>`;
+}
+
+let items = [];
+function render(list){ listEl.innerHTML = list.map(buildCard).join(""); }
+
+async function load() {
+  // 서버측 필터가 필요하면 쿼리스트링 사용: /api/announcements?q=...&region=...&status=Y
+  const res = await fetch("/api/announcements");
+  const j = await res.json();
+  items = j.items || [];
+  render(items);
+  bindEvents();
+}
+
+function applyFilter(){
+  const q = $("#search").value.trim().toLowerCase();
+  const reg = $("#filterRegion").value.trim();
+  const st  = $("#filterStatus").value.trim();
+  let arr = items.slice();
+  if(q){
+    arr = arr.filter(it => {
+      const s = [it.biz_pbanc_nm, it.intg_pbanc_biz_nm, it.pbanc_ctnt, it.pbanc_ntrp_nm, it.supt_biz_clsfc]
+        .map(x=>String(x||"").toLowerCase()).join(" ");
+      return s.includes(q);
+    });
+  }
+  if(reg){ arr = arr.filter(it => String(it.supt_regin||"").includes(reg)); }
+  if(st){  arr = arr.filter(it => String(it.rcrt_prgs_yn||"")===st); }
+  render(arr);
+}
+
+function bindEvents(){
+  listEl.addEventListener("click", (e)=>{
+    const btn = e.target.closest("button[data-action='detail']");
+    if(!btn) return;
+    const sn = String(btn.dataset.sn||"");
+    const it = items.find(x => String(x.pbanc_sn||"")===sn) || items[0];
+    dlgTitle.textContent = it.biz_pbanc_nm || it.intg_pbanc_biz_nm || "지원사업 공고";
+    dlgBody.innerHTML = buildDetailHTML(it);
+    dlg.showModal();
+  });
+
+  ["#search","#filterRegion","#filterStatus"].forEach(sel=>{
+    $(sel).addEventListener("input", applyFilter);
+  });
+  $("#btnReset").addEventListener("click", ()=>{
+    $("#search").value="";
+    $("#filterRegion").value="";
+    $("#filterStatus").value="";
+    applyFilter();
+  });
+}
+
+load();
+</script>
+</body>
+</html>
